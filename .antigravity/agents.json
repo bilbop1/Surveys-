@@ -1,0 +1,132 @@
+{
+  "$schema": "https://antigravity.dev/schemas/agents.json",
+  "version": "1.0",
+  "description": "Antigravity AI IDE agent configurations for Zoom Arbitrage study monitoring system",
+
+  "agents": {
+    "study-scanner": {
+      "name": "Study Scanner",
+      "description": "Monitors research platforms for new high-paying studies",
+      "model": "gemini-3-pro",
+      "mode": "plan",
+      "tools": ["browser", "filesystem", "terminal"],
+      "instructions": "You are a study monitoring agent. Your job is to scan research platforms (Respondent.io, User Interviews, Prolific, UserTesting, dscout) for new paid UX research studies. Extract study details (title, pay, duration), calculate effective hourly rates, and report findings. Focus on studies paying above $50/hr effective rate. Always take screenshots for verification.",
+      "schedule": {
+        "interval": "30m",
+        "platforms": ["respondent", "userinterviews"],
+        "fallbackInterval": "2h",
+        "fallbackPlatforms": ["prolific", "usertesting", "dscout"]
+      },
+      "artifacts": ["screenshots", "study-reports"]
+    },
+
+    "notification-dispatcher": {
+      "name": "Notification Dispatcher",
+      "description": "Sends alerts when high-value studies are found",
+      "model": "gemini-3-flash",
+      "mode": "fast",
+      "tools": ["terminal"],
+      "instructions": "You receive study data from the Study Scanner agent. Format and send notifications via configured channels (Discord, Slack, Telegram, email). Prioritize by hourly rate: >$100/hr = immediate all-channel alert, $50-100/hr = standard notification, <$50/hr = batch.",
+      "triggers": ["study-scanner.new-studies"],
+      "artifacts": ["notification-logs"]
+    },
+
+    "earnings-analyst": {
+      "name": "Earnings Analyst",
+      "description": "Tracks earnings, calculates ROI, and identifies optimization opportunities",
+      "model": "claude-opus-4-5",
+      "mode": "plan",
+      "tools": ["filesystem", "terminal"],
+      "instructions": "You are an earnings analyst for the Zoom Arbitrage system. Analyze earnings data from the SQLite database. Calculate metrics: total earned, effective hourly rate by platform, acceptance rate trends, optimal time slots, and monthly projections. Identify which platforms and study types yield the highest ROI. Generate weekly reports with actionable recommendations.",
+      "schedule": {
+        "interval": "24h"
+      },
+      "artifacts": ["earnings-reports", "optimization-recommendations"]
+    },
+
+    "profile-optimizer": {
+      "name": "Profile Optimizer",
+      "description": "Optimizes platform profiles to increase study acceptance rates",
+      "model": "gemini-3-pro",
+      "mode": "plan",
+      "tools": ["browser", "filesystem"],
+      "instructions": "You are a profile optimization agent. Navigate to each research platform and check profile completeness. Identify missing fields that impact acceptance rates (LinkedIn, demographics, employment, skills). Generate a prioritized checklist of profile improvements. Do NOT modify any profiles — only analyze and report.",
+      "schedule": {
+        "interval": "7d"
+      },
+      "artifacts": ["profile-audits"]
+    },
+
+    "application-tracker": {
+      "name": "Application Tracker",
+      "description": "Tracks study applications and follow-ups across platforms",
+      "model": "gemini-3-flash",
+      "mode": "fast",
+      "tools": ["browser", "filesystem", "terminal"],
+      "instructions": "You track the status of study applications across all platforms. Check for updates on pending applications, note acceptances and rejections, and update the local database. Alert the user for any scheduled sessions that need attention. Never miss a scheduled session — that leads to blacklisting.",
+      "schedule": {
+        "interval": "4h"
+      },
+      "artifacts": ["application-status-reports"]
+    }
+  },
+
+  "workflows": {
+    "daily-routine": {
+      "name": "Daily Arbitrage Routine",
+      "description": "Full daily monitoring and optimization cycle",
+      "steps": [
+        {
+          "agent": "study-scanner",
+          "action": "full-sweep",
+          "description": "Scan all platforms for new studies"
+        },
+        {
+          "agent": "notification-dispatcher",
+          "action": "send-alerts",
+          "description": "Notify about high-value opportunities",
+          "dependsOn": ["study-scanner"]
+        },
+        {
+          "agent": "application-tracker",
+          "action": "check-statuses",
+          "description": "Update application statuses"
+        },
+        {
+          "agent": "earnings-analyst",
+          "action": "daily-report",
+          "description": "Generate daily earnings report",
+          "dependsOn": ["application-tracker"]
+        }
+      ]
+    },
+
+    "opportunity-hunt": {
+      "name": "High-Value Opportunity Hunt",
+      "description": "Quick scan focused only on $75+/hr studies",
+      "steps": [
+        {
+          "agent": "study-scanner",
+          "action": "quick-scan",
+          "config": {
+            "minHourlyRate": 75,
+            "platforms": ["respondent", "userinterviews"]
+          }
+        },
+        {
+          "agent": "notification-dispatcher",
+          "action": "urgent-alert",
+          "dependsOn": ["study-scanner"]
+        }
+      ]
+    }
+  },
+
+  "settings": {
+    "parallelAgents": 3,
+    "defaultModel": "gemini-3-pro",
+    "screenshotsEnabled": true,
+    "screenshotsDir": "./data/screenshots",
+    "databasePath": "./data/zarb.db"
+  }
+}

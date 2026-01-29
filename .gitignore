@@ -1,0 +1,9 @@
+node_modules/
+.env
+data/
+*.db
+*.db-journal
+browser-profile/
+screenshots/
+.playwright/
+dist/
