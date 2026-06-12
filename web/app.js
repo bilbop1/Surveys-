@@ -2,7 +2,8 @@
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-const api = (p, opts) => fetch(p, opts).then((r) => r.json());
+// Routes to the client-side store (store.js) — fully static, no backend.
+const api = (p, opts) => window.StudyFlowAPI(p, opts);
 const money = (n) => '$' + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 const PLAT_COLOR = { respondent: '#7c8bff', userinterviews: '#5ee6a8', usertesting: '#ffd166', prolific: '#ff7a8a', dscout: '#c779ff' };
 const STATUSES = ['invited', 'applied', 'scheduled', 'completed', 'paid'];

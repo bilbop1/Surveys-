@@ -1,0 +1,19 @@
+# StudyFlow — static deploy config for Netlify.
+#
+# The app is pure static + browser localStorage, so there is NO build step
+# and NO backend. We point Netlify's base at web/, which has no package.json,
+# so Netlify skips dependency install entirely (no native better-sqlite3
+# compile, near-zero build credits).
+
+[build]
+  base = "web"
+  publish = "."
+
+# Single-page app: serve index.html for any path.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "20"

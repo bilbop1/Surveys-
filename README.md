@@ -30,13 +30,42 @@ helps you track, follow up, and prepare.
 
 ## Run it
 
+The web app is **fully static** — it stores your data in the browser's
+`localStorage` (nothing leaves your machine) via `web/store.js`. So you can
+just open it, or deploy it anywhere static.
+
 ```bash
-npm install
-npm run seed      # optional: load realistic mock data
-npm run web       # → http://localhost:4173
+# simplest: serve the static folder
+npx serve web            # → http://localhost:3000
+# or with the bundled dev server (also serves web/)
+npm install && npm run web   # → http://localhost:4173
 ```
 
-Voice features need Chrome or Edge (Web Speech API).
+Voice features need Chrome or Edge (Web Speech API). On first load it seeds
+realistic demo data; run `StudyFlowReset()` in the console to wipe it.
+
+## Deploy to Netlify (new isolated site)
+
+Because it's static, this drops onto Netlify's free plan for ~nothing and
+**won't affect any of your other Netlify sites** — each site is independent.
+`netlify.toml` sets `base = "web"`, which has no `package.json`, so Netlify
+skips dependency install (no build, near-zero build credits).
+
+Two ways:
+
+```bash
+# A) drag-and-drop: zip/drop the web/ folder at https://app.netlify.com/drop
+# B) connect this repo in the Netlify UI → it reads netlify.toml automatically
+```
+
+Either gives you a fresh `*.netlify.app` URL. Heads-up on the free plan: sites
+are unlimited, but all sites share one monthly usage pool (legacy: 100 GB /
+300 build-min; credit-based accounts: 300 credits, hard cap). A static
+dashboard uses almost none of it.
+
+> Note: the deployed web app and the optional CLI/SQLite path are **separate
+> local stores** — the browser app uses `localStorage`, the CLI uses
+> `data/zarb.db`. For most people the web app is the only one you'll touch.
 
 ## CLI (optional)
 
