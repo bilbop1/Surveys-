@@ -97,13 +97,84 @@
   const tsAgo = (days = 0) => new Date(Date.now() - days * 86400000).toISOString().slice(0, 19).replace('T', ' ');
   const daysSince = (ts) => (Date.now() - new Date(ts.replace(' ', 'T') + 'Z').getTime()) / 86400000;
 
+  const TIER = { respondent: 50, userinterviews: 50, dscout: 30, usertesting: 30, prolific: 30 };
+
+  function defaultLocker() {
+    return { name: '', location: '', age: '', occupation: '', industry: '', companySize: '', devices: '', intro: '', notes: '' };
+  }
+
+  // Offers you were SENT (notification emails, community links). Compliant:
+  // these come to you — we just parse, rank, and stage them. No crawling.
+  const SEED_OFFERS = () => ([
+    detectOffer("New project match! 'Crypto wallet onboarding interview' pays $150 for a 45 minute session. Apply: https://app.respondent.io/projects/abc123"),
+    detectOffer("You're a match for 'Streaming app feedback' — $75 for 30 min. https://www.userinterviews.com/projects/xyz"),
+    detectOffer("A new study is available: 'Memory & attention survey' — $12.00, 25 minutes. https://app.prolific.com/studies/p987"),
+  ]);
+
+  function detectPlatform(text) {
+    const t = text.toLowerCase();
+    if (t.includes('respondent.io') || t.includes('respondent')) return 'respondent';
+    if (t.includes('userinterviews')) return 'userinterviews';
+    if (t.includes('prolific')) return 'prolific';
+    if (t.includes('usertesting')) return 'usertesting';
+    if (t.includes('dscout')) return 'dscout';
+    return 'unknown';
+  }
+
+  // Heuristic parser for a pasted notification email / link blurb.
+  function detectOffer(raw) {
+    const text = (raw || '').trim();
+    const platform = detectPlatform(text);
+
+    // pay: first $ / £ / € amount
+    const payM = text.match(/[$£€]\s?(\d+(?:\.\d{1,2})?)/);
+    const payAmount = payM ? Math.round(parseFloat(payM[1])) : null;
+
+    // duration: minutes, or hours → minutes
+    let durationMinutes = null;
+    const hr = text.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\b/i);
+    const mn = text.match(/(\d+)\s*(?:minutes?|mins?)\b/i);
+    if (hr) durationMinutes = Math.round(parseFloat(hr[1]) * 60);
+    else if (mn) durationMinutes = parseInt(mn[1]);
+
+    const urlM = text.match(/https?:\/\/[^\s)>'"]+/);
+    const url = urlM ? urlM[0] : null;
+
+    // title: a quoted phrase if present, else the email subject, else first line.
+    // Prefer double/smart quotes; for single quotes require a leading boundary
+    // so contractions like "You're" don't get mistaken for an opening quote.
+    let title = null;
+    let quoted = text.match(/["“”]([^"“”]{4,80})["“”]/);
+    if (!quoted) quoted = text.match(/(?:^|\s)'([^']{4,80})'/);
+    if (quoted) title = quoted[1].trim();
+    if (!title) { const subj = text.match(/subject:\s*(.+)/i); if (subj) title = subj[1].trim().slice(0, 80); }
+    if (!title) title = text.split('\n').map((l) => l.trim()).filter(Boolean)[0]?.slice(0, 80) || 'Untitled offer';
+
+    return { id: 'o' + Math.random().toString(36).slice(2, 9), platform, title, pay_amount: payAmount, duration_minutes: durationMinutes, url, raw: text, created_at: tsAgo(0), score: 0 };
+  }
+
+  function scoreOffer(o) {
+    let s = 0;
+    if (o.pay_amount && o.duration_minutes) s += (o.pay_amount / o.duration_minutes) * 60 * 2;
+    if (o.pay_amount) s += o.pay_amount;
+    s += TIER[o.platform] || 0;
+    if (o.duration_minutes && o.duration_minutes <= 30) s += 20;
+    return Math.round(s);
+  }
+
   function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } }
   function save(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
-  function blank() { return { studies: [], applications: [], earnings: [], seq: 1 }; }
+  function blank() { return { studies: [], applications: [], earnings: [], offers: [], locker: null, seq: 1 }; }
 
   function ensure() {
     let d = load();
-    if (d && (d.studies.length || d.earnings.length || d.applications.length)) return d;
+    if (d && (d.studies.length || d.earnings.length || d.applications.length)) {
+      let changed = false;
+      if (!d.offers) { d.offers = []; changed = true; }
+      if (!d.locker) { d.locker = defaultLocker(); changed = true; }
+      if (changed) save(d);
+      return d;
+    }
     d = blank();
     SEED_LEADS.forEach((l, i) => {
       const sid = `${l.platform}-${slug(l.title)}-${i}`;
@@ -113,6 +184,8 @@
         completed_at: l.status === 'completed' ? tsAgo(l.daysAgo) : null, notes: null });
     });
     SEED_EARN.forEach((e) => d.earnings.push({ id: d.seq++, study_id: null, platform: e.platform, amount: e.amount, duration_minutes: e.dur, earned_at: tsAgo(e.daysAgo), notes: e.notes }));
+    d.offers = SEED_OFFERS().map((o) => ({ ...o, score: scoreOffer(o) }));
+    d.locker = defaultLocker();
     save(d);
     return d;
   }
@@ -202,6 +275,33 @@
     return { ok: true };
   }
 
+  // ----- offers (the compliant "finder": ingest + rank what you were sent) -----
+  function listOffers(d) { return d.offers.slice().sort((a, b) => b.score - a.score); }
+
+  function addOffer(raw) {
+    const d = ensure();
+    const o = detectOffer(raw);
+    o.score = scoreOffer(o);
+    d.offers.unshift(o);
+    save(d);
+    return o;
+  }
+
+  function dismissOffer(id) { const d = ensure(); d.offers = d.offers.filter((o) => o.id !== id); save(d); return { ok: true }; }
+
+  // Accept an offer → it becomes a lead in the pipeline (status: applied).
+  function acceptOffer(id) {
+    const d = ensure();
+    const o = d.offers.find((x) => x.id === id);
+    if (!o) return { ok: false };
+    d.offers = d.offers.filter((x) => x.id !== id);
+    save(d);
+    return addLead({ platform: o.platform === 'unknown' ? 'respondent' : o.platform, title: o.title, payAmount: o.pay_amount, durationMinutes: o.duration_minutes, url: o.url, status: 'applied' });
+  }
+
+  function getLocker(d) { return d.locker || defaultLocker(); }
+  function putLocker(b) { const d = ensure(); d.locker = { ...defaultLocker(), ...b }; save(d); return { ok: true }; }
+
   // ----- router: mimics the old REST API -----
   window.StudyFlowAPI = async function (path, opts = {}) {
     const method = (opts.method || 'GET').toUpperCase();
@@ -214,8 +314,16 @@
     if (path === '/api/prep') return PREP;
     if (path === '/api/leads' && method === 'POST') return addLead(body);
     if (path === '/api/earnings' && method === 'POST') return addEarning(body);
+    if (path === '/api/offers' && method === 'GET') return listOffers(d);
+    if (path === '/api/offers' && method === 'POST') return addOffer(body.raw || '');
+    if (path === '/api/locker' && method === 'GET') return getLocker(d);
+    if (path === '/api/locker' && method === 'PUT') return putLocker(body);
     const m = path.match(/^\/api\/applications\/(\d+)$/);
     if (m && method === 'PATCH') return patchApp(m[1], body);
+    const oa = path.match(/^\/api\/offers\/([^/]+)\/accept$/);
+    if (oa && method === 'POST') return acceptOffer(oa[1]);
+    const od = path.match(/^\/api\/offers\/([^/]+)$/);
+    if (od && method === 'DELETE') return dismissOffer(od[1]);
 
     throw new Error('Unknown route: ' + method + ' ' + path);
   };

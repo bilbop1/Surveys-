@@ -20,6 +20,7 @@
     <nav class="rail glass">
       <div class="logo">S</div>
       <button class="nav-btn active" data-view="dashboard" title="Dashboard">◎</button>
+      <button class="nav-btn" data-view="offers" title="Offers">✉</button>
       <button class="nav-btn" data-view="pipeline" title="Pipeline">⊞</button>
       <button class="nav-btn" data-view="prep" title="Interview Prep">✦</button>
       <div class="spacer"></div>
@@ -44,6 +45,29 @@
           <div class="glass"><div class="bars" id="bars"></div></div>
           <div class="section-title">By platform</div>
           <div class="glass" id="platforms"></div>
+        </div>
+
+        <!-- OFFERS -->
+        <div class="view" id="view-offers">
+          <div class="glass paste-box">
+            <div class="paste-head">
+              <div>
+                <div class="paste-title">Drop an offer</div>
+                <div class="paste-sub">Paste a study-invite email (or just a link). It parses pay, length & platform, ranks it, and stages it to apply. Nothing is scraped — these are offers sent to you.</div>
+              </div>
+            </div>
+            <textarea id="offerInput" placeholder="Paste the notification email or link here…"></textarea>
+            <div class="btn-row" style="justify-content:flex-end;margin-top:12px">
+              <button class="btn" id="offerSample">Try a sample</button>
+              <button class="btn primary" id="offerParse">Parse &amp; add</button>
+            </div>
+          </div>
+
+          <div class="section-title">Available — ranked by value</div>
+          <div id="offerList" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
+
+          <div class="section-title">Application locker <span class="locker-hint">— saved on this device, copy into any screener</span></div>
+          <div class="glass locker" id="locker"></div>
         </div>
 
         <!-- PIPELINE -->

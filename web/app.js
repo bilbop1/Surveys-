@@ -17,6 +17,7 @@ function showView(name) {
   $$('.nav-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   if (name === 'pipeline') loadPipeline();
   if (name === 'prep') loadPrep();
+  if (name === 'offers') loadOffers();
 }
 $$('.nav-btn[data-view]').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 
@@ -107,6 +108,93 @@ async function advanceLead(id, status, title, pay) {
     toast(`"${title}" → ${STATUS_LABEL[next]}`);
   }
   loadPipeline();
+}
+
+/* ---------- offers (compliant finder) ---------- */
+const SAMPLE_OFFER = "New project match! 'Fitness app habit interview' pays $120 for a 1 hour session. Apply here: https://app.respondent.io/projects/demo123";
+
+async function loadOffers() {
+  const offers = await api('/api/offers');
+  $('#offerList').innerHTML = offers.length ? offers.map(offerCard).join('')
+    : '<p class="prep-blurb">No offers staged. Paste a study-invite email above to get started.</p>';
+  $$('#offerList .accept').forEach((b) => b.addEventListener('click', () => acceptOffer(b.dataset.id, b.dataset.title)));
+  $$('#offerList .dismiss').forEach((b) => b.addEventListener('click', () => dismissOffer(b.dataset.id)));
+  loadLocker();
+}
+
+function offerCard(o) {
+  const hourly = o.pay_amount && o.duration_minutes ? `$${((o.pay_amount / o.duration_minutes) * 60).toFixed(0)}/hr` : '';
+  const plat = o.platform === 'unknown' ? 'unknown' : o.platform;
+  return `<div class="card glass offer">
+    <div class="offer-top">
+      <span class="dot" style="background:${PLAT_COLOR[plat] || '#888'}"></span>
+      <span class="pill plat">${plat}</span>
+      <span class="offer-score" title="value score">${o.score}</span>
+    </div>
+    <div class="offer-title">${o.title}</div>
+    <div class="meta">
+      <span class="pill pay">${o.pay_amount ? money(o.pay_amount) : '— pay'}</span>
+      <span class="pill">${o.duration_minutes ? o.duration_minutes + ' min' : '— length'}</span>
+      ${hourly ? `<span class="rate">${hourly}</span>` : ''}
+    </div>
+    <div class="btn-row" style="margin-top:14px;justify-content:flex-start">
+      ${o.url ? `<a class="btn" href="${o.url}" target="_blank" rel="noopener">Open to apply ↗</a>` : ''}
+      <button class="btn primary accept" data-id="${o.id}" data-title="${o.title}">Track as applied</button>
+      <button class="btn dismiss" data-id="${o.id}" title="Dismiss">✕</button>
+    </div>
+  </div>`;
+}
+
+async function acceptOffer(id, title) {
+  await api(`/api/offers/${id}/accept`, { method: 'POST' });
+  toast(`"${title}" → pipeline (Applied)`, true);
+  loadOffers();
+  loadSummary();
+}
+async function dismissOffer(id) { await api(`/api/offers/${id}`, { method: 'DELETE' }); loadOffers(); }
+
+async function parseOffer(raw) {
+  if (!raw.trim()) { toast('Paste an email or link first'); return; }
+  const o = await api('/api/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw }) });
+  $('#offerInput').value = '';
+  const got = [o.pay_amount ? money(o.pay_amount) : null, o.duration_minutes ? o.duration_minutes + 'min' : null].filter(Boolean).join(' · ');
+  toast(`Parsed ${o.platform}${got ? ' — ' + got : ''}`, true);
+  loadOffers();
+}
+$('#offerParse').addEventListener('click', () => parseOffer($('#offerInput').value));
+$('#offerSample').addEventListener('click', () => { $('#offerInput').value = SAMPLE_OFFER; });
+
+/* ---------- application locker ---------- */
+const LOCKER_FIELDS = [
+  ['name', 'Name', false], ['location', 'Location (city, country)', false],
+  ['age', 'Age', false], ['occupation', 'Occupation / title', false],
+  ['industry', 'Industry', false], ['companySize', 'Company size', false],
+  ['devices', 'Devices / tools you use', true], ['intro', '20-second intro blurb', true],
+  ['notes', 'Common screener answers', true],
+];
+let lockerData = null;
+
+async function loadLocker() {
+  lockerData = await api('/api/locker');
+  $('#locker').innerHTML = LOCKER_FIELDS.map(([k, label, big]) => `
+    <div class="locker-field">
+      <label>${label}</label>
+      <div class="locker-row">
+        ${big ? `<textarea data-k="${k}" rows="2">${lockerData[k] || ''}</textarea>`
+              : `<input data-k="${k}" value="${(lockerData[k] || '').replace(/"/g, '&quot;')}" />`}
+        <button class="copy" data-k="${k}" title="Copy">⧉</button>
+      </div>
+    </div>`).join('') + `<div class="btn-row" style="justify-content:flex-end"><button class="btn primary" id="lockerSave">Save locker</button></div>`;
+
+  $$('#locker [data-k]').forEach((el) => { if (el.tagName !== 'BUTTON') el.addEventListener('input', () => (lockerData[el.dataset.k] = el.value)); });
+  $$('#locker .copy').forEach((b) => b.addEventListener('click', async () => {
+    const v = lockerData[b.dataset.k] || '';
+    try { await navigator.clipboard.writeText(v); toast('Copied'); } catch { toast('Copy failed'); }
+  }));
+  $('#lockerSave').addEventListener('click', async () => {
+    await api('/api/locker', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lockerData) });
+    toast('Locker saved', true);
+  });
 }
 
 /* ---------- prep ---------- */
@@ -221,6 +309,12 @@ async function handleCommand(said) {
   const reply = (txt) => { showVoiceLog(`"${said}"`, txt); speak(txt); };
 
   if (/dashboard|home|overview|earnings overview/.test(said)) { showView('dashboard'); return reply('Here\'s your dashboard.'); }
+  if (/offer|what should i apply|recommend|find.* stud|available/.test(said)) {
+    showView('offers');
+    const offers = await api('/api/offers');
+    if (offers.length) { const top = offers[0]; const hr = top.pay_amount && top.duration_minutes ? `, about ${((top.pay_amount/top.duration_minutes)*60).toFixed(0)} dollars an hour` : ''; return reply(`Top offer: ${top.title} on ${top.platform}, ${top.pay_amount ? money(top.pay_amount) : 'unknown pay'}${hr}.`); }
+    return reply('No offers staged yet. Paste a study invite to add one.');
+  }
   if (/pipeline|leads|kanban|studies/.test(said)) { showView('pipeline'); return reply('Opening your pipeline.'); }
   if (/prep|practice|interview/.test(said)) { showView('prep'); return reply('Let\'s prep.'); }
   if (/add (a )?lead|new lead|add study/.test(said)) { openModal(); return reply('Add a new lead.'); }
