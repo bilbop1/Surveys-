@@ -10,12 +10,10 @@
 
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["@netlify/blobs"]
 
-# Single-page app: serve index.html for any path (except functions).
-[[redirects]]
-  from = "/.netlify/functions/*"
-  status = 200
-
+# Single-page app: serve index.html for any path.
+# Functions are served automatically at /.netlify/functions/*
 [[redirects]]
   from = "/*"
   to = "/index.html"
