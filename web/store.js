@@ -327,8 +327,34 @@
   function getLocker(d) { return d.locker || defaultLocker(); }
   function putLocker(b) { const d = ensure(); d.locker = { ...defaultLocker(), ...b }; save(d); return { ok: true }; }
 
+  // ----- server detection -----
+  // If the Node server (server.js) is running, pass every call straight
+  // through to it (SQLite persistence, Gmail polling). Otherwise fall back
+  // to this localStorage store so the static deploy keeps working.
+  let serverMode = null;
+  async function detectServer() {
+    if (serverMode !== null) return serverMode;
+    try {
+      const r = await fetch('/api/health', { signal: AbortSignal.timeout(1200) });
+      const j = await r.json();
+      serverMode = !!(j && j.ok);
+    } catch { serverMode = false; }
+    window.StudyFlowMode = serverMode ? 'server' : 'static';
+    return serverMode;
+  }
+  window.StudyFlowDetectServer = detectServer;
+
   // ----- router: mimics the old REST API -----
   window.StudyFlowAPI = async function (path, opts = {}) {
+    if (await detectServer()) {
+      const res = await fetch(path, opts);
+      if (!res.ok) {
+        let msg = res.statusText;
+        try { msg = (await res.json()).error || msg; } catch {}
+        throw new Error(msg);
+      }
+      return res.json();
+    }
     const method = (opts.method || 'GET').toUpperCase();
     const body = opts.body ? JSON.parse(opts.body) : {};
     const d = ensure();

@@ -8,6 +8,8 @@
     "zarb": "./src/cli.js"
   },
   "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "web": "node server.js",
     "seed": "node src/seed.js",
     "track": "node src/cli.js track",
@@ -21,15 +23,13 @@
     "commander": "^12.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.22.2",
+    "imapflow": "^1.4.0",
     "inquirer": "^12.1.0",
+    "mailparser": "^3.9.9",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.16",
     "open": "^10.1.0",
     "ora": "^8.1.0"
-  },
-  "devDependencies": {
-    "playwright-extra": "^4.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -113,17 +113,26 @@ async function advanceLead(id, status, title, pay) {
 /* ---------- offers (compliant finder) ---------- */
 const SAMPLE_OFFER = "New project match! 'Fitness app habit interview' pays $120 for a 1 hour session. Apply here: https://app.respondent.io/projects/demo123";
 
-let gmailConnected = false;
-
 async function checkGmailStatus() {
+  // Server mode: ask the Node server. Static mode: ask the Netlify function.
+  const serverMode = await window.StudyFlowDetectServer();
   try {
-    const res = await fetch('/.netlify/functions/gmail-status');
-    const data = await res.json();
-    gmailConnected = data.connected;
-    updateGmailUI(data);
+    if (serverMode) {
+      const data = await api('/api/gmail/status');
+      updateGmailUI({
+        connected: data.connected,
+        mode: data.mode,
+        lastSync: data.lastSync?.at || null,
+        lastSyncCount: data.lastSync?.added || 0,
+        serverMode: true,
+      });
+    } else {
+      const res = await fetch('/.netlify/functions/gmail-status');
+      const data = await res.json();
+      updateGmailUI({ ...data, serverMode: false });
+    }
   } catch (e) {
-    gmailConnected = false;
-    updateGmailUI({ connected: false });
+    updateGmailUI({ connected: false, serverMode });
   }
 }
 
@@ -132,13 +141,21 @@ function updateGmailUI(data) {
   if (!el) return;
   if (data.connected) {
     const syncTime = data.lastSync ? new Date(data.lastSync).toLocaleTimeString() : 'never';
+    const modeTag = data.mode === 'imap' ? 'IMAP · polls every 5 min' : data.mode === 'oauth' ? 'OAuth' : '';
     el.innerHTML = `
       <span class="gmail-dot connected"></span>
       <span>Gmail connected</span>
-      <span class="gmail-sub">Last sync: ${syncTime}${data.lastSyncCount ? ` (${data.lastSyncCount} offers)` : ''}</span>
+      <span class="gmail-sub">${modeTag ? modeTag + ' · ' : ''}Last sync: ${syncTime}${data.lastSyncCount ? ` (+${data.lastSyncCount})` : ''}</span>
       <button class="btn" id="gmailSync">Sync now</button>
     `;
     $('#gmailSync')?.addEventListener('click', syncGmail);
+  } else if (data.serverMode) {
+    el.innerHTML = `
+      <span class="gmail-dot"></span>
+      <span>Auto-ingest from email</span>
+      <span class="gmail-sub">Set GMAIL_USER + GMAIL_APP_PASSWORD in .env (see setup guide), or</span>
+      <a class="btn primary" href="/api/gmail/auth">Connect via OAuth</a>
+    `;
   } else {
     el.innerHTML = `
       <span class="gmail-dot"></span>
@@ -152,30 +169,25 @@ async function syncGmail() {
   const btn = $('#gmailSync');
   if (btn) { btn.textContent = 'Syncing…'; btn.disabled = true; }
   try {
-    const res = await fetch('/.netlify/functions/gmail-sync');
-    const data = await res.json();
-    if (data.needsAuth) {
-      toast('Gmail needs re-authorization');
-      gmailConnected = false;
-      updateGmailUI({ connected: false });
-      return;
-    }
-    if (data.error) { toast(data.error); return; }
-    // Merge synced offers into localStorage
-    if (data.offers?.length) {
-      for (const o of data.offers) {
-        await api('/api/offers/merge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(o)
-        });
-      }
-      toast(`Synced ${data.offers.length} offers from Gmail`, true);
+    if (await window.StudyFlowDetectServer()) {
+      // Server inserts straight into SQLite — one call does it all.
+      const r = await api('/api/gmail/sync', { method: 'POST' });
+      toast(r.added ? `Synced +${r.added} new offer(s) from ${r.scanned} emails` : `Scanned ${r.scanned} emails — nothing new`, !!r.added);
     } else {
-      toast('No new study emails found');
+      const res = await fetch('/.netlify/functions/gmail-sync');
+      const data = await res.json();
+      if (data.needsAuth) { toast('Gmail needs re-authorization'); updateGmailUI({ connected: false, serverMode: false }); return; }
+      if (data.error) { toast(data.error); return; }
+      if (data.offers?.length) {
+        for (const o of data.offers) {
+          await api('/api/offers/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(o) });
+        }
+        toast(`Synced ${data.offers.length} offers from Gmail`, true);
+      } else {
+        toast('No new study emails found');
+      }
     }
     await loadOffers();
-    checkGmailStatus();
   } catch (e) {
     toast('Sync failed: ' + e.message);
   } finally {
@@ -320,8 +332,8 @@ function startAnswer() {
     $('#timer').textContent = `${m}:${String(s).padStart(2, '0')}`;
   }, 1000);
 
-  const rec = new SR();
-  rec.continuous = true; rec.interimResults = true; rec.lang = 'en-US';
+  const rec = makeRecognizer();
+  rec.continuous = true; rec.interimResults = true;
   let finalText = '';
   $('#practiceStart').textContent = 'Listening… tap to stop';
   $('#practiceStart').onclick = () => { rec.stop(); };
@@ -356,12 +368,52 @@ function speak(text) {
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let listening = false;
 
-function startVoiceCommand() {
-  if (!SR) { toast('Voice commands need Chrome/Edge'); return; }
+// Amplitude-reactive orb: drive --amp on the mic button from the live input.
+let ampCtx = null, ampStream = null, ampRaf = null;
+async function startAmpMeter() {
+  try {
+    ampStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    ampCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ampCtx.createMediaStreamSource(ampStream);
+    const analyser = ampCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    const tick = () => {
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; sum += d * d; }
+      const rms = Math.sqrt(sum / buf.length);
+      $('#mic').style.setProperty('--amp', Math.min(1, rms * 4).toFixed(3));
+      ampRaf = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch { /* meter is decorative — recognition still works without it */ }
+}
+function stopAmpMeter() {
+  cancelAnimationFrame(ampRaf);
+  ampStream?.getTracks().forEach((t) => t.stop());
+  ampCtx?.close().catch(() => {});
+  ampCtx = ampStream = null;
+  $('#mic').style.removeProperty('--amp');
+}
+
+function makeRecognizer() {
   const rec = new SR();
-  rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.lang = 'en-US';
+  // Chrome 139+: on-device recognition — audio never leaves the machine.
+  // Older browsers ignore the property and use their default engine.
+  try { rec.processLocally = true; } catch { /* not supported */ }
+  return rec;
+}
+
+function startVoiceCommand() {
+  if (!SR) { toast('Voice commands need Chrome/Edge/Safari'); return; }
+  const rec = makeRecognizer();
+  rec.interimResults = false; rec.maxAlternatives = 1;
   listening = true;
   $('#mic').classList.add('listening');
+  startAmpMeter();
   showVoiceLog('Listening…', '');
   rec.onresult = (e) => {
     const said = e.results[0][0].transcript.toLowerCase();
@@ -369,7 +421,7 @@ function startVoiceCommand() {
     handleCommand(said);
   };
   rec.onerror = () => toast('Didn\'t catch that');
-  rec.onend = () => { listening = false; $('#mic').classList.remove('listening'); };
+  rec.onend = () => { listening = false; $('#mic').classList.remove('listening'); stopAmpMeter(); };
   rec.start();
 }
 $('#mic').addEventListener('click', startVoiceCommand);

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StudyFlow — The Setup Guide</title>
+<style>
+  /* ─────────────────────────────────────────────────────────
+     StudyFlow Setup Guide — liquid glass, screen-first,
+     prints to a clean light PDF (Cmd/Ctrl+P → Save as PDF).
+     ───────────────────────────────────────────────────────── */
+  :root {
+    --bg: #07070c;
+    --text: #f4f5fb;
+    --muted: rgba(244,245,251,0.66);
+    --faint: rgba(244,245,251,0.42);
+    --accent: #7c8bff;
+    --accent2: #c779ff;
+    --good: #5ee6a8;
+    --warn: #ffd166;
+    --hot: #ff7a8a;
+    --blur: saturate(160%) blur(16px) brightness(1.06);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+  .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; filter: blur(8px); pointer-events: none; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.45; }
+  .b1 { width: 55vw; height: 55vw; background: #5b6cff; top: -15%; left: -10%; }
+  .b2 { width: 45vw; height: 45vw; background: #c14bff; top: 40%; right: -12%; }
+  .b3 { width: 38vw; height: 38vw; background: #2dd4bf; bottom: -10%; left: 25%; opacity: 0.3; }
+
+  .page { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 56px 28px 90px; }
+
+  /* glass primitive */
+  .glass {
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+    border-radius: 24px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.30), inset 0 -1px 0 rgba(255,255,255,0.06),
+                inset 0 0 24px rgba(255,255,255,0.04), 0 18px 50px rgba(0,0,0,0.45);
+    position: relative; isolation: isolate;
+    padding: 28px 30px; margin: 22px 0;
+  }
+  .glass::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.06) 35%,
+      rgba(255,255,255,0) 60%, rgba(255,255,255,0.22) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude; pointer-events: none;
+  }
+
+  /* hero */
+  .hero { text-align: center; padding: 30px 10px 16px; }
+  .hero .logo {
+    width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 22px;
+    background: linear-gradient(140deg, var(--accent), var(--accent2));
+    display: grid; place-items: center; font-weight: 800; font-size: 30px; color: #fff;
+    box-shadow: 0 12px 36px rgba(124,139,255,0.55);
+  }
+  h1 { font-size: 42px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; }
+  h1 .grad, .grad {
+    background: linear-gradient(120deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p { color: var(--muted); font-size: 17px; max-width: 600px; margin: 14px auto 0; }
+
+  h2 { font-size: 26px; font-weight: 750; letter-spacing: -0.6px; margin: 52px 0 6px; display: flex; align-items: center; gap: 14px; }
+  h3 { font-size: 16px; font-weight: 700; margin: 18px 0 6px; }
+  .stepnum {
+    width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(140deg, var(--accent), var(--accent2));
+    display: inline-grid; place-items: center; font-size: 17px; font-weight: 800; color: #fff;
+    box-shadow: 0 8px 22px rgba(124,139,255,0.4);
+  }
+  .lede { color: var(--muted); font-size: 15px; margin: 2px 0 0 52px; }
+
+  p, li { font-size: 15px; color: var(--muted); }
+  strong { color: var(--text); font-weight: 650; }
+  ol, ul { margin: 10px 0 4px 22px; }
+  li { margin-bottom: 9px; }
+  li::marker { color: var(--accent); font-weight: 700; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px; padding: 2px 7px; font-size: 13px; color: #c6e2ff;
+  }
+  pre {
+    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px; padding: 16px 18px; overflow-x: auto; margin: 12px 0;
+  }
+  pre code { background: none; border: none; padding: 0; display: block; line-height: 1.7; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .pill {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    padding: 4px 12px; border-radius: 999px; text-transform: uppercase;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.16);
+  }
+  .pill.good { color: var(--good); border-color: rgba(94,230,168,0.4); }
+  .pill.warn { color: var(--warn); border-color: rgba(255,209,102,0.4); }
+  .pill.hot  { color: var(--hot);  border-color: rgba(255,122,138,0.4); }
+
+  /* platform cards */
+  .plats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 22px 0; }
+  .plat { padding: 22px 24px; margin: 0; }
+  .plat h3 { display: flex; align-items: center; gap: 10px; margin-top: 0; font-size: 17px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .plat .pay { font-size: 13px; color: var(--good); font-weight: 700; margin-bottom: 8px; }
+  .plat ul { margin-left: 18px; }
+  .plat li { font-size: 13.5px; margin-bottom: 6px; }
+  @media (max-width: 720px) { .plats { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { text-align: left; color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px; }
+  td { padding: 10px; border-top: 1px solid rgba(255,255,255,0.08); color: var(--muted); }
+  td:first-child { color: var(--text); font-weight: 600; }
+
+  .callout { border-left: 3px solid var(--accent); padding: 14px 20px; border-radius: 0 16px 16px 0; margin: 16px 0;
+    background: rgba(124,139,255,0.08); }
+  .callout.danger { border-color: var(--hot); background: rgba(255,122,138,0.07); }
+  .callout.gold { border-color: var(--warn); background: rgba(255,209,102,0.06); }
+  .callout p, .callout li { font-size: 14px; }
+
+  .check { list-style: none; margin-left: 4px; }
+  .check li { padding-left: 30px; position: relative; }
+  .check li::before {
+    content: "✓"; position: absolute; left: 0; top: 0;
+    width: 20px; height: 20px; border-radius: 7px; font-size: 12px; font-weight: 800;
+    display: grid; place-items: center; color: #08130c;
+    background: linear-gradient(140deg, var(--good), #2dd4bf);
+  }
+
+  .voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-top: 10px; }
+  .voice-grid div { font-size: 14px; color: var(--muted); padding: 7px 0; border-bottom: 1px dashed rgba(255,255,255,0.1); }
+  .voice-grid b { color: var(--accent); font-weight: 650; }
+  @media (max-width: 600px) { .voice-grid { grid-template-columns: 1fr; } }
+
+  .foot { text-align: center; color: var(--faint); font-size: 13px; margin-top: 70px; }
+  .printbtn {
+    position: fixed; bottom: 26px; right: 26px; z-index: 50;
+    padding: 14px 22px; border-radius: 16px; border: none; cursor: pointer;
+    font-weight: 700; font-size: 14px; color: #fff;
+    background: linear-gradient(120deg, var(--accent), var(--accent2));
+    box-shadow: 0 14px 36px rgba(124,139,255,0.5);
+  }
+
+  /* ───────────── PRINT: dark → light, glass → hairline boxes ───────────── */
+  @page { size: A4; margin: 13mm 15mm; }
+  @media print {
+    :root { color-scheme: light; }
+    body { background: #fff !important; color: #16181f; font-size: 10.5pt; line-height: 1.45; }
+    .aurora, .printbtn { display: none !important; }
+    .page { max-width: none; padding: 0; }
+    .glass {
+      background: #fff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+      box-shadow: none !important; border: 0.6pt solid #c9ccd4; border-radius: 8px;
+      padding: 14px 18px; margin: 10px 0; break-inside: avoid;
+    }
+    .glass::before { display: none; }
+    h1 { font-size: 24pt; color: #16181f; }
+    h2 { font-size: 15pt; margin: 18pt 0 4pt; break-after: avoid; }
+    h3 { break-after: avoid; }
+    .grad, h1 .grad { -webkit-text-fill-color: #5b5bd6; color: #5b5bd6; background: none; }
+    .hero .logo, .stepnum {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    p, li, td, .lede, .voice-grid div { color: #34373f; }
+    strong, td:first-child { color: #111; }
+    code { background: #f0f1f5; border-color: #d4d6dd; color: #232c6b; }
+    pre { background: #f6f7fa; border-color: #d4d6dd; }
+    pre code { color: #232c6b; }
+    a { color: #232c6b; text-decoration: underline; }
+    .callout { background: #f6f7fb !important; }
+    .callout.danger { background: #fdf3f4 !important; }
+    .callout.gold { background: #fdf9ee !important; }
+    .pill { border-color: #c9ccd4; color: #444; }
+    .pill.good { color: #0b7a4b; } .pill.warn { color: #926c00; } .pill.hot { color: #b3404e; }
+    .check li::before { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .plats { grid-template-columns: 1fr 1fr; }
+    section, .plat, table, .callout { break-inside: avoid; }
+    p { orphans: 3; widows: 3; }
+  }
+</style>
+</head>
+<body>
+<div class="aurora"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<button class="printbtn" onclick="window.print()">⤓ Save as PDF</button>
+
+<div class="page">
+
+  <!-- ═══════════════ HERO ═══════════════ -->
+  <header class="hero">
+    <div class="logo">S</div>
+    <h1>StudyFlow <span class="grad">Control Center</span><br/>The Setup Guide</h1>
+    <p>One read, start to finish, and your paid-research operation is live: a dedicated inbox feeding
+    a private dashboard, reachable from every device you own, with zero terms-of-service risk.</p>
+  </header>
+
+  <!-- ═══════════════ HOW IT FITS TOGETHER ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">◎</span> How the machine fits together</h2>
+    <p class="lede">Five pieces. Each one is boring on its own — together they remove every excuse between you and a booked session.</p>
+    <div class="glass">
+      <ol>
+        <li><strong>A dedicated Gmail account</strong> — every research platform points its notifications here. One inbox = one source of truth.</li>
+        <li><strong>The five platforms</strong> — Respondent, User Interviews, UserTesting, Prolific, dscout — each tuned to email you the moment a study matches you.</li>
+        <li><strong>StudyFlow</strong> — your private dashboard. It reads <em>that inbox only</em> (your own mail, nothing scraped), parses every invite into a ranked offer card, tracks your pipeline, logs earnings, and preps you for interviews with voice practice.</li>
+        <li><strong>The application locker</strong> — your screener answers, saved once, copied in two clicks whenever you apply.</li>
+        <li><strong>Tailscale</strong> — hosts the dashboard on your Windows PC and makes it securely available on your Mac and iPhone, over real HTTPS, invisible to the public internet.</li>
+      </ol>
+      <div class="callout">
+        <p><strong>The compliance line, drawn once:</strong> automation points at <em>your own data</em> (your inbox, your notes, your calendar) — never at the platforms. The platforms email you; StudyFlow reads your email. You click "apply" yourself, you answer screeners yourself. That line is what keeps all five accounts alive. (Prolific's 2025–26 authenticity checks detect AI agents at ~100% and AI-written answers at 98.7% — being human at the platform boundary isn't just ethics, it's strategy.)</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ STEP 1 — GMAIL ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">1</span> Build the inbox <span class="pill">~15 min</span></h2>
+    <p class="lede">A fresh Gmail used for exactly one thing: research-platform mail. Blast radius if anything leaks: zero.</p>
+    <div class="glass">
+      <ol>
+        <li>Create the account at <a href="https://accounts.google.com">accounts.google.com</a> — something like <code>yourname.research@gmail.com</code>. Use it for <strong>nothing else</strong>.</li>
+        <li>Turn on <strong>2-Step Verification</strong>: myaccount.google.com → Security. (Required for the next step.)</li>
+        <li>Create an <strong>App Password</strong>: <a href="https://myaccount.google.com/apppasswords">myaccount.google.com/apppasswords</a> → name it <code>studyflow</code> → copy the 16-character password somewhere safe for Step 3. This is how StudyFlow reads the inbox — read-only, revocable any time, no Google Cloud project, no expiring tokens.</li>
+        <li>As platform mail starts arriving (Step 2), make a filter per platform: open a message → search <code>from:userinterviews.com</code> → "Show search options" → <strong>Create filter</strong> → <em>Apply label</em> (e.g. "UserInterviews") + <em>Never send to Spam</em>. Repeat for <code>respondent.io</code>, <code>usertesting.com</code>, <code>prolific.com</code>, <code>dscout.com</code>.</li>
+        <li>Whitelist the two documented invite senders by adding them to Contacts: <code>Schedule@userinterviews.com</code> (study invites) and <code>Compensation@userinterviews.com</code> (payouts).</li>
+      </ol>
+      <div class="callout gold">
+        <p><strong>Why an app password and not "Sign in with Google"?</strong> Google's OAuth route for reading Gmail requires a Cloud project, a consent screen, and — for personal apps left in "Testing" mode — refresh tokens that die every 7 days. The app password does the same job in two minutes and never expires until you revoke it. It lives only in a file on your own PC.</p>
+      </div>
+      <div class="callout danger">
+        <p><strong>Never paste the app password into a chat, email, or anything cloud-side</strong> — including AI assistants. It goes in exactly one place: the <code>.env</code> file on your machine (Step 3). If it ever leaks, revoke it at myaccount.google.com and mint a new one; nothing else breaks.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ STEP 2 — PLATFORMS ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">2</span> Tune the five platforms <span class="pill">~90 min, pays for itself forever</span></h2>
+    <p class="lede">Sign up with your new research Gmail. Then spend the time where it actually moves invite rates — profiles and notification settings.</p>
+
+    <div class="plats">
+      <div class="glass plat">
+        <h3><span class="dot" style="background:#7c8bff"></span>Respondent</h3>
+        <div class="pay">$100–$350+ per interview · the high-ticket platform</div>
+        <ul>
+          <li><strong>Verify a real work email</strong> (company domain — not gmail). This is the single documented unlock for B2B "Industry Professional" studies, the highest-paying tier on any platform.</li>
+          <li>Complete Settings → Professional background, connect LinkedIn.</li>
+          <li>Enable <strong>email + SMS</strong> notifications.</li>
+          <li>Payouts land 7–10 business days after the researcher confirms.</li>
+        </ul>
+      </div>
+      <div class="glass plat">
+        <h3><span class="dot" style="background:#5ee6a8"></span>User Interviews</h3>
+        <div class="pay">$50–$100+ median per study</div>
+        <ul>
+          <li>Connect <strong>LinkedIn/Facebook</strong> — identity verification measurably drives matches.</li>
+          <li>Keep job title + location current; use <strong>Quick Apply</strong> studies.</li>
+          <li>Official warning: AI-written screener answers are spotted and hurt approval. Write your own — the locker makes it fast.</li>
+          <li>Invites come from <code>Schedule@userinterviews.com</code>; reminders re-send after 48h.</li>
+        </ul>
+      </div>
+      <div class="glass plat">
+        <h3><span class="dot" style="background:#ffd166"></span>UserTesting</h3>
+        <div class="pay">~$10 per 20-min test · 1–2 tests/week typical · most speed-sensitive</div>
+        <ul>
+          <li>Tests are <strong>first-come, first-served</strong>. Settings → Notification Preferences → enable <strong>Email and Sounds</strong>; keep the dashboard tab open during your active hours.</li>
+          <li>Your rating = average of your <strong>last 12 reviews</strong> and directly controls invite volume. Narrate constantly, follow instructions exactly.</li>
+          <li>Dispute unfair 1–2★ ratings — staff manually review them.</li>
+        </ul>
+      </div>
+      <div class="glass plat">
+        <h3><span class="dot" style="background:#ff7a8a"></span>Prolific</h3>
+        <div class="pay">$8–13/hr steady volume · AI-annotation tasks pay best · strictest rules</div>
+        <ul>
+          <li>Fill out <strong>100% of "About You"</strong>, especially priority questions. Never "rather not say".</li>
+          <li>Install the official <strong>Prolific Assistant</strong> extension (Chrome/Firefox) — the only sanctioned instant-alert tool; third-party snipers risk bans.</li>
+          <li><strong>No VPN, ever</strong> (even iCloud Private Relay). No rushing — suspiciously fast submissions are themselves a fraud flag.</li>
+          <li>Banned accounts re-apply through a waitlist with ~13% acceptance. Don't test the fence.</li>
+        </ul>
+      </div>
+      <div class="glass plat">
+        <h3><span class="dot" style="background:#c779ff"></span>dscout</h3>
+        <div class="pay">$25–$150 per mission · lumpy bonus income</div>
+        <ul>
+          <li>Missions are selfie-video diaries; selection weighs "mission fit + scout quality" — submit <strong>well-lit, articulate screener videos</strong>.</li>
+          <li>Enable <strong>push notifications</strong> in the dscout app; applications cap out, so earlier is safer.</li>
+          <li>10–20% application acceptance is normal — volume of applications wins.</li>
+        </ul>
+      </div>
+      <div class="glass plat">
+        <h3><span class="dot" style="background:#8e9bb5"></span>Honest math</h3>
+        <div class="pay">What "good" actually looks like</div>
+        <ul>
+          <li>An active generalist running all five: <strong>~$200–600/month</strong>. Niche professionals (devs, healthcare, finance, founders) with verified work emails can do multiples of that on Respondent/User Interviews alone.</li>
+          <li>User Interviews officially calls 1–2 studies <em>per six months</em> typical for a passive profile — the gap between passive and tuned-up is the whole game, and it's exactly what Steps 1–3 close.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout danger">
+      <p><strong>The three account-killers, on every platform:</strong> ① AI-generated screener/study answers ② VPNs &amp; location spoofing ③ duplicate accounts or borrowed identities. All five platforms terminate for misrepresentation; Respondent also claws back earned incentives. One account, your real self, your own words.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════ STEP 3 — STUDYFLOW ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">3</span> Light up StudyFlow <span class="pill">~10 min</span></h2>
+    <p class="lede">Clone, configure, run. The dashboard auto-detects the server and switches from demo mode to live SQLite + Gmail polling.</p>
+    <div class="glass">
+      <ol>
+        <li>Install <a href="https://nodejs.org">Node.js 20+</a> (LTS) if you haven't.</li>
+        <li>In a terminal (PowerShell on Windows):
+<pre><code>git clone &lt;your-repo-url&gt; StudyFlow
+cd StudyFlow
+npm install
+copy .env.example .env     # macOS/Linux: cp .env.example .env</code></pre></li>
+        <li>Open <code>.env</code> in any editor and fill in two lines with Step 1's credentials:
+<pre><code>GMAIL_USER=yourname.research@gmail.com
+GMAIL_APP_PASSWORD=abcd efgh ijkl mnop</code></pre></li>
+        <li>Start it:
+<pre><code>npm start</code></pre>
+        Open <a href="http://localhost:4173">http://localhost:4173</a>. The Offers tab should show "Gmail connected · IMAP · polls every 5 min".</li>
+        <li>Fill the <strong>Application Locker</strong> (Offers tab, bottom): name, location, occupation, devices, a 20-second intro, your common screener answers. From now on every application is copy-paste-send.</li>
+        <li>Hit <strong>Sync now</strong> — any study invites from the last 7 days appear as ranked offer cards: pay, length, effective hourly, one button to open-and-apply, one to track it in the pipeline.</li>
+      </ol>
+      <h3>The loop, once it's running</h3>
+      <ul class="check">
+        <li>Platform emails an invite → StudyFlow's 5-minute poll picks it up → ranked offer card appears.</li>
+        <li>You glance, open the best one, paste locker answers, apply — under two minutes.</li>
+        <li>"Track as applied" → kanban pipeline → click cards to advance → moving to Paid logs the earning automatically.</li>
+        <li>Dashboard shows totals, effective hourly, per-platform performance, and what needs a follow-up.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════════ STEP 4 — TAILSCALE ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">4</span> Host on the Windows PC, use it everywhere <span class="pill">~20 min</span></h2>
+    <p class="lede">Yes — Windows hosts it, your Mac and iPhone reach it, and it costs $0. Tailscale's free plan covers 6 users / unlimited personal devices, and Serve keeps it tailnet-only (never public).</p>
+    <div class="glass">
+      <h3>On the Windows PC (host)</h3>
+      <ol>
+        <li>Install Tailscale from <a href="https://tailscale.com/download/windows">tailscale.com/download/windows</a>, sign in.</li>
+        <li>In the <a href="https://login.tailscale.com/admin/dns">admin console → DNS</a>: confirm <strong>MagicDNS</strong> is on, click <strong>Enable HTTPS</strong>.</li>
+        <li>Tray icon → Preferences → <strong>Run unattended</strong> (keeps the tunnel alive when logged out).</li>
+        <li>Optional: rename the machine to <code>studyflow</code> in admin console → Machines.</li>
+        <li>Make StudyFlow start at boot — PowerShell <em>as Administrator</em>:
+<pre><code>git clone https://github.com/jessety/pm2-installer.git
+cd pm2-installer
+npm run configure
+npm run setup
+pm2 start C:\path\to\StudyFlow\server.js --name studyflow
+pm2 save</code></pre></li>
+        <li>Publish it to your tailnet over HTTPS (same admin PowerShell):
+<pre><code>tailscale serve --bg 4173</code></pre>
+        It prints your URL — e.g. <code>https://studyflow.tail1234.ts.net</code>. The <code>--bg</code> config survives reboots; check with <code>tailscale serve status</code>.</li>
+      </ol>
+      <h3>On the Mac</h3>
+      <ol>
+        <li>Install Tailscale (App Store or tailscale.com), sign in with the <strong>same account</strong>, toggle on.</li>
+        <li>Open the <code>https://…ts.net</code> URL. Real Let's Encrypt padlock, no warnings.</li>
+      </ol>
+      <h3>On the iPhone</h3>
+      <ol>
+        <li>Tailscale iOS app → sign in → accept the VPN profile → same URL in Safari.</li>
+      </ol>
+      <div class="callout">
+        <p><strong>Why HTTPS matters here:</strong> browsers only allow microphone access (voice commands, practice mode) on secure origins. <code>http://192.168.x.x:4173</code> from your Mac would silently kill the mic. The Tailscale Serve URL is a genuine HTTPS origin — voice works everywhere.</p>
+      </div>
+      <p><strong>If something fails:</strong> <code>tailscale status</code> on both machines → both online? <code>tailscale serve status</code> on Windows → proxy live? <code>pm2 list</code> → app running? First cert issuance can take ~60 seconds.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════ VOICE ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">5</span> Drive it with your voice</h2>
+    <p class="lede">Tap the mic (or ⌘+Space inside the app) and talk. On Chrome 139+ recognition runs on-device — audio never leaves your machine.</p>
+    <div class="glass">
+      <div class="voice-grid">
+        <div><b>"What should I apply to?"</b> — top-ranked offer, read aloud</div>
+        <div><b>"How much have I made?"</b> — totals + effective hourly</div>
+        <div><b>"What's next?"</b> — upcoming sessions, stale follow-ups</div>
+        <div><b>"Show pipeline"</b> — kanban view</div>
+        <div><b>"Add a lead"</b> — opens the entry form</div>
+        <div><b>"Start practice"</b> — voice interview rehearsal</div>
+      </div>
+      <p style="margin-top:14px">Practice mode reads real moderator-style questions out loud, times your spoken answer, and transcribes it so you can hear yourself ramble — the cheapest interview-performance upgrade that exists. Sessions where you're articulate and easy to work with are what get you re-invited.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════ WORKFLOW ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">6</span> The operating rhythm</h2>
+    <p class="lede">The system removes friction; this rhythm turns it into income.</p>
+    <div class="glass">
+      <table>
+        <tr><th>When</th><th>What</th><th>Time</th></tr>
+        <tr><td>Morning + lunch + evening</td><td>Glance at Offers. Apply to anything ≥ your hourly floor — same-day on Respondent/User Interviews invites, instantly on UserTesting/Prolific (slots are first-come).</td><td>3 × 5 min</td></tr>
+        <tr><td>Before any live session</td><td>One voice-practice rep in the category. Camera, light, quiet check.</td><td>10 min</td></tr>
+        <tr><td>Weekly</td><td>Pipeline pass: advance cards, nudge stale applications (3+ days), log payouts. Check the per-platform $/hr chart — feed the winners.</td><td>15 min</td></tr>
+        <tr><td>Monthly</td><td>Profiles still current? Job title, devices, "About You" priority answers. Update the locker with new screener answers you keep retyping.</td><td>15 min</td></tr>
+      </table>
+      <div class="callout gold">
+        <p><strong>Set an hourly floor and obey it.</strong> The score on every offer card already includes effective $/hr. A $15 study that eats 50 minutes of screeners is a worse trade than a $100 interview you prep for. Reputation compounds: never no-show, cancel 24h+ ahead inside the platform, and protect your UserTesting rating like it's a credit score — because for invites, it is.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ FINAL CHECKLIST ═══════════════ -->
+  <section>
+    <h2><span class="stepnum">✓</span> Done when…</h2>
+    <div class="glass">
+      <ul class="check">
+        <li>Dedicated Gmail exists, 2FA on, app password minted, filters labeling all five platforms.</li>
+        <li>All five platforms signed up with that email, profiles 100%, LinkedIn connected where offered, work email verified on Respondent.</li>
+        <li>Notifications on everywhere: email+SMS (Respondent), email (User Interviews — senders whitelisted), email+sounds (UserTesting), Prolific Assistant extension, dscout app push.</li>
+        <li><code>.env</code> holds the Gmail credentials; <code>npm start</code> shows "Gmail connected"; a manual sync produced offer cards.</li>
+        <li>Locker filled — applying to anything takes under two minutes.</li>
+        <li>Tailscale Serve URL opens on the Mac and iPhone with a padlock; voice commands work there.</li>
+        <li>pm2 keeps it alive across reboots (<code>pm2 list</code> after a restart shows <code>studyflow │ online</code>).</li>
+      </ul>
+      <p style="margin-top:16px">That's the whole machine. The platforms send the work to one inbox; the inbox feeds one dashboard; the dashboard is everywhere you are. You just answer honestly, show up lit and articulate, and let the compounding do its thing.</p>
+    </div>
+  </section>
+
+  <p class="foot">StudyFlow · your data, your machine · nothing here automates a research platform, and that's precisely why it keeps working.</p>
+</div>
+</body>
+</html>

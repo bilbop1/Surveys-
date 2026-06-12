@@ -80,6 +80,25 @@ function initSchema(db) {
       config TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS offers (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      title TEXT,
+      pay_amount REAL,
+      duration_minutes INTEGER,
+      url TEXT,
+      raw TEXT,
+      source TEXT DEFAULT 'paste',
+      score INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_offers_score ON offers(score DESC);
     CREATE INDEX IF NOT EXISTS idx_studies_platform ON studies(platform);
     CREATE INDEX IF NOT EXISTS idx_studies_discovered ON studies(discovered_at);
     CREATE INDEX IF NOT EXISTS idx_studies_pay ON studies(pay_amount DESC);
@@ -268,6 +287,64 @@ export function upsertProfile(platform, data) {
 export function getProfiles() {
   const db = getDb();
   return db.prepare(`SELECT * FROM platform_profiles`).all();
+}
+
+// --- Offer Operations ---
+
+export function listOffers() {
+  const db = getDb();
+  return db.prepare(`SELECT * FROM offers ORDER BY score DESC, created_at DESC`).all();
+}
+
+export function insertOffer(o) {
+  const db = getDb();
+  return db.prepare(`
+    INSERT INTO offers (id, platform, title, pay_amount, duration_minutes, url, raw, source, score)
+    VALUES (@id, @platform, @title, @payAmount, @durationMinutes, @url, @raw, @source, @score)
+    ON CONFLICT(id) DO NOTHING
+  `).run({
+    id: o.id,
+    platform: o.platform || 'unknown',
+    title: o.title || 'Untitled offer',
+    payAmount: o.pay_amount ?? null,
+    durationMinutes: o.duration_minutes ?? null,
+    url: o.url || null,
+    raw: o.raw || null,
+    source: o.source || 'paste',
+    score: o.score || 0,
+  });
+}
+
+export function offerExistsByUrl(url) {
+  const db = getDb();
+  return db.prepare(`SELECT 1 FROM offers WHERE url = ?`).get(url) != null;
+}
+
+export function deleteOffer(id) {
+  const db = getDb();
+  return db.prepare(`DELETE FROM offers WHERE id = ?`).run(id);
+}
+
+export function getOffer(id) {
+  const db = getDb();
+  return db.prepare(`SELECT * FROM offers WHERE id = ?`).get(id);
+}
+
+// --- Settings (key-value JSON) ---
+
+export function getSetting(key, fallback = null) {
+  const db = getDb();
+  const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key);
+  if (!row) return fallback;
+  try { return JSON.parse(row.value); } catch { return fallback; }
+}
+
+export function putSetting(key, value) {
+  const db = getDb();
+  return db.prepare(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, JSON.stringify(value));
 }
 
 export function closeDb() {

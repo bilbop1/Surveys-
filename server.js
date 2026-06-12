@@ -10,13 +10,19 @@
  * backed by the existing local SQLite store (src/db.js).
  */
 
+import 'dotenv/config';
 import express from 'express';
+import cron from 'node-cron';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
   getDb, upsertStudy, addApplication, updateApplicationStatus,
   getApplications, addEarning, getEarningsStats, getNewStudies,
+  listOffers, insertOffer, deleteOffer, getOffer, offerExistsByUrl,
+  getSetting, putSetting,
 } from './src/db.js';
+import { detectOffer } from './src/offers.js';
+import { gmailStatus, gmailMode, syncGmail, oauthUrl, exchangeCode } from './src/gmail.js';
 import { PREP_BANK } from './src/prep.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -147,7 +153,103 @@ app.get('/api/recent', (req, res) => {
 // Interview prep question bank (static, local).
 app.get('/api/prep', (req, res) => res.json(PREP_BANK));
 
+// Frontend probes this to decide server mode vs static localStorage mode.
+app.get('/api/health', (req, res) => res.json({ ok: true, mode: 'server' }));
+
+// --- Offers: parse / rank what landed in YOUR inbox ---
+
+app.get('/api/offers', (req, res) => res.json(listOffers()));
+
+app.post('/api/offers', (req, res) => {
+  const raw = (req.body?.raw || '').trim();
+  if (!raw) return res.status(400).json({ error: 'raw text required' });
+  const offer = detectOffer(raw);
+  insertOffer(offer);
+  res.json(offer);
+});
+
+app.post('/api/offers/merge', (req, res) => {
+  const o = req.body || {};
+  if (o.url && offerExistsByUrl(o.url)) return res.json({ ok: true, skipped: true });
+  const offer = detectOffer(o.snippet || o.raw || o.title || '', { id: o.id, source: o.source || 'gmail' });
+  if (o.title) offer.title = o.title;
+  if (o.pay != null) offer.pay_amount = o.pay;
+  if (o.duration != null) offer.duration_minutes = o.duration;
+  if (o.url) offer.url = o.url;
+  if (o.platform && o.platform !== 'unknown') offer.platform = o.platform;
+  const result = insertOffer(offer);
+  res.json({ ok: true, added: result.changes > 0, offer });
+});
+
+app.delete('/api/offers/:id', (req, res) => { deleteOffer(req.params.id); res.json({ ok: true }); });
+
+// Accept an offer → it becomes a pipeline lead (status: applied).
+app.post('/api/offers/:id/accept', (req, res) => {
+  const o = getOffer(req.params.id);
+  if (!o) return res.status(404).json({ error: 'offer not found' });
+  const platform = o.platform === 'unknown' ? 'respondent' : o.platform;
+  const id = slugId(platform, o.title || 'untitled');
+  upsertStudy({ id, platform, title: o.title, payAmount: o.pay_amount, durationMinutes: o.duration_minutes, url: o.url });
+  const result = addApplication(id, platform);
+  deleteOffer(o.id);
+  res.json({ ok: true, applicationId: result.lastInsertRowid, studyId: id });
+});
+
+// --- Application locker: reusable screener answers ---
+
+const LOCKER_DEFAULT = { name: '', location: '', age: '', occupation: '', industry: '', companySize: '', devices: '', intro: '', notes: '' };
+app.get('/api/locker', (req, res) => res.json(getSetting('locker', LOCKER_DEFAULT)));
+app.put('/api/locker', (req, res) => { putSetting('locker', { ...LOCKER_DEFAULT, ...(req.body || {}) }); res.json({ ok: true }); });
+
+// --- Gmail ingest (reads your own inbox; see src/gmail.js) ---
+
+app.get('/api/gmail/status', (req, res) => res.json(gmailStatus()));
+
+app.get('/api/gmail/auth', (req, res) => {
+  if (gmailMode() !== 'oauth') return res.status(400).send('OAuth mode not configured — set GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET in .env (or use the simpler IMAP app-password mode).');
+  const redirect = `${req.protocol}://${req.get('host')}/api/gmail/callback`;
+  res.redirect(oauthUrl(redirect));
+});
+
+app.get('/api/gmail/callback', async (req, res) => {
+  try {
+    const redirect = `${req.protocol}://${req.get('host')}/api/gmail/callback`;
+    await exchangeCode(req.query.code, redirect);
+    res.redirect('/?gmail=connected');
+  } catch (err) {
+    res.status(400).send(`Gmail authorization failed: ${err.message}`);
+  }
+});
+
+app.post('/api/gmail/sync', async (req, res) => {
+  try {
+    res.json(await syncGmail());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Background poll: every 5 minutes, if Gmail is configured. Reading your
+// own inbox on a schedule is the entire automation surface — nothing here
+// ever touches a research platform.
+if (gmailMode()) {
+  let syncing = false; // overrun guard: never start a poll while one is in flight
+  cron.schedule('*/5 * * * *', async () => {
+    if (syncing) return;
+    syncing = true;
+    try {
+      const r = await syncGmail();
+      if (r.added) console.log(`  [gmail] +${r.added} new offer(s) from ${r.scanned} scanned emails`);
+    } catch (err) {
+      console.error(`  [gmail] sync failed: ${err.message}`);
+    } finally {
+      syncing = false;
+    }
+  });
+}
+
 app.listen(PORT, () => {
   console.log(`\n  StudyFlow running → http://localhost:${PORT}`);
+  console.log(`  Gmail ingest: ${gmailMode() ? gmailMode() + ' mode, polling every 5 min' : 'not configured (set .env — see .env.example)'}`);
   console.log('  Compliant mode: no platform automation. Your data, your machine.\n');
 });

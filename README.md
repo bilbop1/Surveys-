@@ -6,15 +6,26 @@ research studies (Respondent, User Interviews, UserTesting, Prolific, dscout).
 It is a private dashboard for **you, the participant**. It does not scrape,
 log into, or automate any research platform — doing that violates their terms
 and, as of 2026, reliably gets accounts banned and earnings confiscated
-(Prolific's Feb-2026 bot-authenticity checks detect AI agents with ~100%
-accuracy). StudyFlow stays entirely on your side of the line: you enter your
-own leads (or paste them from the platforms' own notification emails), and it
-helps you track, follow up, and prepare.
+(Prolific's authenticity checks detect AI agents at ~100% accuracy and
+LLM-written answers at 98.7% precision). StudyFlow stays entirely on your side
+of the line: the platforms email you study invites, and StudyFlow reads **your
+own inbox** to turn them into ranked, one-click-to-apply offer cards — plus
+tracking, follow-ups, voice control, and interview practice.
 
-![liquid glass UI](web/)
+**→ Start with the [Setup Guide](web/setup-guide.html)** — one read takes you
+from nothing to a fully wired control center (dedicated Gmail, all five
+platforms tuned, dashboard live, reachable from every device via Tailscale).
+It's served at `/setup-guide.html` when the app is running, and prints to a
+clean PDF.
 
 ## What it does
 
+- **Offers** — your study-invite emails, auto-ingested from a dedicated Gmail
+  (IMAP app-password or OAuth, polled every 5 min) or pasted in manually.
+  Each is parsed (platform, pay, length), scored by effective $/hr, and staged
+  with an *Open to apply* link. Nothing is scraped — these were sent to you.
+- **Application locker** — your reusable screener answers (intro blurb,
+  occupation, devices…), copy-to-clipboard, so applying takes two minutes.
 - **Dashboard** — total earned, effective $/hr, this-month, pipeline value, and
   follow-ups that need attention.
 - **Pipeline** — a glass kanban of every lead across `Invited → Applied →
@@ -25,47 +36,49 @@ helps you track, follow up, and prepare.
   aloud, listens to your spoken answer, times you, and transcribes it. Being
   good in sessions is the real income lever — good sessions get you re-invited.
 - **Voice control** — tap the mic (or ⌘+Space) and say things like
-  *"show pipeline"*, *"how much have I made"*, *"what's next"*, *"add a lead"*,
-  or *"start practice"*. Built on the browser's Web Speech API.
+  *"what should I apply to"*, *"show pipeline"*, *"how much have I made"*,
+  *"what's next"*, or *"start practice"*. Uses on-device recognition on
+  Chrome 139+ (audio never leaves your machine), Web Speech API elsewhere.
 
-## Run it
-
-The web app is **fully static** — it stores your data in the browser's
-`localStorage` (nothing leaves your machine) via `web/store.js`. So you can
-just open it, or deploy it anywhere static.
+## Run it (server mode — recommended)
 
 ```bash
-# simplest: serve the static folder
-npx serve web            # → http://localhost:3000
-# or with the bundled dev server (also serves web/)
-npm install && npm run web   # → http://localhost:4173
+npm install
+cp .env.example .env     # then fill in GMAIL_USER + GMAIL_APP_PASSWORD
+npm start                # → http://localhost:4173
+npm run dev              # same, with auto-restart on file changes
 ```
 
-Voice features need Chrome or Edge (Web Speech API). On first load it seeds
-realistic demo data; run `StudyFlowReset()` in the console to wipe it.
+Server mode persists everything in local SQLite (`data/zarb.db`) and polls
+your dedicated Gmail every 5 minutes for new study invites. The Gmail
+credentials are an **app password for an inbox you create just for platform
+notifications** — read-only blast radius, revocable any time, no Google Cloud
+project needed. See the [Setup Guide](web/setup-guide.html) for the 15-minute
+walkthrough.
 
-## Deploy to Netlify (new isolated site)
+### Static fallback
 
-Because it's static, this drops onto Netlify's free plan for ~nothing and
-**won't affect any of your other Netlify sites** — each site is independent.
-`netlify.toml` sets `base = "web"`, which has no `package.json`, so Netlify
-skips dependency install (no build, near-zero build credits).
+The web app also runs with **no backend at all** — it detects the server is
+absent and falls back to browser `localStorage` (demo seed data included;
+`StudyFlowReset()` in the console wipes it). That's what the earlier Netlify
+deploy used, and it still works: drop `web/` on any static host.
 
-Two ways:
+## Host on Windows, use from your Mac/iPhone (Tailscale)
 
-```bash
-# A) drag-and-drop: zip/drop the web/ folder at https://app.netlify.com/drop
-# B) connect this repo in the Netlify UI → it reads netlify.toml automatically
+The Setup Guide has the full runbook, in short:
+
+```powershell
+# on the Windows PC, as admin — keep it alive across reboots:
+#   https://github.com/jessety/pm2-installer
+pm2 start C:\path\to\StudyFlow\server.js --name studyflow && pm2 save
+# publish HTTPS to your private tailnet (never public):
+tailscale serve --bg 4173
 ```
 
-Either gives you a fresh `*.netlify.app` URL. Heads-up on the free plan: sites
-are unlimited, but all sites share one monthly usage pool (legacy: 100 GB /
-300 build-min; credit-based accounts: 300 credits, hard cap). A static
-dashboard uses almost none of it.
-
-> Note: the deployed web app and the optional CLI/SQLite path are **separate
-> local stores** — the browser app uses `localStorage`, the CLI uses
-> `data/zarb.db`. For most people the web app is the only one you'll touch.
+That prints `https://<machine>.<tailnet>.ts.net` — open it from any of your
+Tailscale-connected devices. The real HTTPS origin matters: browsers only
+allow microphone access (voice features) on secure origins, so the Tailscale
+URL keeps voice working from the Mac, unlike a plain `http://<ip>:4173`.
 
 ## CLI (optional)
 
@@ -81,21 +94,24 @@ node src/cli.js track --list
 ## Architecture
 
 ```
-server.js        Express API over the local SQLite tracker (no platform access)
-src/db.js        SQLite store: studies, applications, earnings
-src/prep.js      Interview prep question bank
-src/seed.js      Mock data seeder
-src/cli.js       Local CLI (stats / track / lead)
-web/             Liquid-glass single-page app (index.html, styles.css, app.js)
+server.js              Express API + static host + 5-min Gmail poll (no platform access)
+src/db.js              SQLite store: studies, applications, earnings, offers, settings
+src/offers.js          Offer parser/scorer (shared by paste + Gmail ingest)
+src/gmail.js           Gmail ingest: IMAP app-password or OAuth, your inbox only
+src/prep.js            Interview prep question bank
+src/cli.js             Local CLI (stats / track / lead)
+web/                   Liquid-glass SPA (auto-detects server vs static mode)
+web/setup-guide.html   The printable end-to-end setup guide
 ```
 
 ## Why "compliant" is the whole point
 
 The honest economics: research participation is a *nice supplement*, not an
-"arbitrage" — a few hundred dollars a month for most people, occasionally more
-with sought-after demographics. The bottleneck is never *finding* studies (the
-platforms email you matches for free); it's *getting selected* and *being good
-once you're in the room*. So StudyFlow automates the only things you can
-legitimately automate: **your own organization, follow-up discipline, and
-practice.** Everything that would touch a platform's servers with a bot has
-been deliberately left out.
+"arbitrage" — roughly $200–600/month for an active generalist, more with
+sought-after professional demographics. The bottleneck is never *finding*
+studies (the platforms email you matches for free); it's *getting selected*
+and *being good once you're in the room*. So StudyFlow automates the only
+things you can legitimately automate: **your own inbox, organization,
+follow-up discipline, and practice.** Everything that would touch a platform's
+servers with a bot has been deliberately left out — and the platforms' own
+2025–26 detection systems are exactly why that trade is correct.
