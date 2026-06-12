@@ -113,10 +113,81 @@ async function advanceLead(id, status, title, pay) {
 /* ---------- offers (compliant finder) ---------- */
 const SAMPLE_OFFER = "New project match! 'Fitness app habit interview' pays $120 for a 1 hour session. Apply here: https://app.respondent.io/projects/demo123";
 
+let gmailConnected = false;
+
+async function checkGmailStatus() {
+  try {
+    const res = await fetch('/.netlify/functions/gmail-status');
+    const data = await res.json();
+    gmailConnected = data.connected;
+    updateGmailUI(data);
+  } catch (e) {
+    gmailConnected = false;
+    updateGmailUI({ connected: false });
+  }
+}
+
+function updateGmailUI(data) {
+  const el = $('#gmailStatus');
+  if (!el) return;
+  if (data.connected) {
+    const syncTime = data.lastSync ? new Date(data.lastSync).toLocaleTimeString() : 'never';
+    el.innerHTML = `
+      <span class="gmail-dot connected"></span>
+      <span>Gmail connected</span>
+      <span class="gmail-sub">Last sync: ${syncTime}${data.lastSyncCount ? ` (${data.lastSyncCount} offers)` : ''}</span>
+      <button class="btn" id="gmailSync">Sync now</button>
+    `;
+    $('#gmailSync')?.addEventListener('click', syncGmail);
+  } else {
+    el.innerHTML = `
+      <span class="gmail-dot"></span>
+      <span>Auto-ingest from email</span>
+      <a class="btn primary" href="/.netlify/functions/gmail-auth">Connect Gmail</a>
+    `;
+  }
+}
+
+async function syncGmail() {
+  const btn = $('#gmailSync');
+  if (btn) { btn.textContent = 'Syncing…'; btn.disabled = true; }
+  try {
+    const res = await fetch('/.netlify/functions/gmail-sync');
+    const data = await res.json();
+    if (data.needsAuth) {
+      toast('Gmail needs re-authorization');
+      gmailConnected = false;
+      updateGmailUI({ connected: false });
+      return;
+    }
+    if (data.error) { toast(data.error); return; }
+    // Merge synced offers into localStorage
+    if (data.offers?.length) {
+      for (const o of data.offers) {
+        await api('/api/offers/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(o)
+        });
+      }
+      toast(`Synced ${data.offers.length} offers from Gmail`, true);
+    } else {
+      toast('No new study emails found');
+    }
+    await loadOffers();
+    checkGmailStatus();
+  } catch (e) {
+    toast('Sync failed: ' + e.message);
+  } finally {
+    if (btn) { btn.textContent = 'Sync now'; btn.disabled = false; }
+  }
+}
+
 async function loadOffers() {
+  await checkGmailStatus();
   const offers = await api('/api/offers');
   $('#offerList').innerHTML = offers.length ? offers.map(offerCard).join('')
-    : '<p class="prep-blurb">No offers staged. Paste a study-invite email above to get started.</p>';
+    : '<p class="prep-blurb">No offers staged. Paste a study-invite email above, or connect Gmail to auto-sync.</p>';
   $$('#offerList .accept').forEach((b) => b.addEventListener('click', () => acceptOffer(b.dataset.id, b.dataset.title)));
   $$('#offerList .dismiss').forEach((b) => b.addEventListener('click', () => dismissOffer(b.dataset.id)));
   loadLocker();

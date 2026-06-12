@@ -1,0 +1,10 @@
+{
+  "name": "studyflow-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "StudyFlow - UX research study tracking dashboard",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^8.0.0"
+  }
+}

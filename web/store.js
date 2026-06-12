@@ -289,6 +289,31 @@
 
   function dismissOffer(id) { const d = ensure(); d.offers = d.offers.filter((o) => o.id !== id); save(d); return { ok: true }; }
 
+  // Merge a Gmail-synced offer (skip if already exists by gmail ID or URL)
+  function mergeOffer(incoming) {
+    const d = ensure();
+    // Skip if we already have this Gmail message
+    if (incoming.id?.startsWith('gmail-') && d.offers.some((o) => o.id === incoming.id)) return { ok: true, skipped: true };
+    // Skip if we have the same URL already
+    if (incoming.url && d.offers.some((o) => o.url === incoming.url)) return { ok: true, skipped: true };
+    // Convert to our internal format
+    const o = {
+      id: incoming.id || 'o' + Math.random().toString(36).slice(2, 9),
+      platform: incoming.platform || 'unknown',
+      title: incoming.title || 'Untitled',
+      pay_amount: incoming.pay || null,
+      duration_minutes: incoming.duration || null,
+      url: incoming.url || null,
+      raw: incoming.snippet || '',
+      created_at: tsAgo(0),
+      source: incoming.source || 'gmail',
+    };
+    o.score = scoreOffer(o);
+    d.offers.unshift(o);
+    save(d);
+    return { ok: true, added: true, offer: o };
+  }
+
   // Accept an offer → it becomes a lead in the pipeline (status: applied).
   function acceptOffer(id) {
     const d = ensure();
@@ -316,6 +341,7 @@
     if (path === '/api/earnings' && method === 'POST') return addEarning(body);
     if (path === '/api/offers' && method === 'GET') return listOffers(d);
     if (path === '/api/offers' && method === 'POST') return addOffer(body.raw || '');
+    if (path === '/api/offers/merge' && method === 'POST') return mergeOffer(body);
     if (path === '/api/locker' && method === 'GET') return getLocker(d);
     if (path === '/api/locker' && method === 'PUT') return putLocker(body);
     const m = path.match(/^\/api\/applications\/(\d+)$/);
