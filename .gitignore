@@ -7,3 +7,6 @@ browser-profile/
 screenshots/
 .playwright/
 dist/
+
+# Local Netlify folder
+.netlify
