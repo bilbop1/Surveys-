@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyFlow</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- animated mesh background -->
+  <div class="aurora">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="blob b4"></div>
+  </div>
+
+  <div class="app">
+    <!-- nav rail -->
+    <nav class="rail glass">
+      <div class="logo">S</div>
+      <button class="nav-btn active" data-view="dashboard" title="Dashboard">◎</button>
+      <button class="nav-btn" data-view="pipeline" title="Pipeline">⊞</button>
+      <button class="nav-btn" data-view="prep" title="Interview Prep">✦</button>
+      <div class="spacer"></div>
+      <button class="nav-btn" id="micRail" title="Voice (⌘+space)">🎙</button>
+    </nav>
+
+    <!-- main -->
+    <main class="main">
+      <header class="topbar glass">
+        <div class="greeting">
+          <h1 id="hello">Welcome back</h1>
+          <p id="subhead">Your compliant research control layer — your data, your machine.</p>
+        </div>
+        <button class="mic" id="mic" title="Tap and speak">🎙</button>
+      </header>
+
+      <section class="content">
+        <!-- DASHBOARD -->
+        <div class="view active" id="view-dashboard">
+          <div class="grid stats" id="statCards"></div>
+          <div class="section-title">Earnings — last months</div>
+          <div class="glass"><div class="bars" id="bars"></div></div>
+          <div class="section-title">By platform</div>
+          <div class="glass" id="platforms"></div>
+        </div>
+
+        <!-- PIPELINE -->
+        <div class="view" id="view-pipeline">
+          <div class="kanban" id="kanban"></div>
+        </div>
+
+        <!-- PREP -->
+        <div class="view" id="view-prep">
+          <div class="tabs" id="prepTabs"></div>
+          <p class="prep-blurb" id="prepBlurb"></p>
+          <div id="prepQuestions"></div>
+          <div class="tips glass" id="prepTips"></div>
+          <div class="practice glass" id="practice" style="display:none">
+            <div class="qbig" id="practiceQ"></div>
+            <div class="timer" id="timer">0:00</div>
+            <div class="btn-row">
+              <button class="btn primary" id="practiceStart">Speak my answer</button>
+              <button class="btn" id="practiceNext">Next question</button>
+            </div>
+            <div class="transcript" id="practiceTranscript">Your spoken answer will appear here…</div>
+          </div>
+          <div class="btn-row" style="margin-top:22px">
+            <button class="btn primary" id="startPractice">Start voice practice</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- add lead FAB -->
+  <button class="fab" id="fab" title="Add a lead">+</button>
+
+  <!-- add lead modal -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal glass">
+      <h2>Add a lead</h2>
+      <div class="field">
+        <label>Study title</label>
+        <input id="f-title" placeholder="e.g. Fintech dashboard concept test" />
+      </div>
+      <div class="field two">
+        <div>
+          <label>Platform</label>
+          <select id="f-platform">
+            <option value="respondent">Respondent</option>
+            <option value="userinterviews">User Interviews</option>
+            <option value="usertesting">UserTesting</option>
+            <option value="prolific">Prolific</option>
+            <option value="dscout">dscout</option>
+          </select>
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="f-status">
+            <option value="invited">Invited</option>
+            <option value="applied" selected>Applied</option>
+            <option value="scheduled">Scheduled</option>
+          </select>
+        </div>
+      </div>
+      <div class="field two">
+        <div><label>Pay ($)</label><input id="f-pay" type="number" placeholder="150" /></div>
+        <div><label>Duration (min)</label><input id="f-dur" type="number" placeholder="60" /></div>
+      </div>
+      <div class="btn-row" style="justify-content:flex-end;margin-top:8px">
+        <button class="btn" id="modalCancel">Cancel</button>
+        <button class="btn primary" id="modalSave">Save lead</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="voice-log glass" id="voiceLog">
+    <div class="heard" id="voiceHeard">Listening…</div>
+    <div class="said" id="voiceSaid"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
